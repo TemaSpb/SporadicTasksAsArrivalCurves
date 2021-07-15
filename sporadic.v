@@ -164,22 +164,22 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
             move: H2 => [a [b [ABNOQ [A_IN_TAB B_IN_TAB]]]].
             specialize (RESPECTS_SPORADIC a b).
             unfold task_arrivals_between in A_IN_TAB.
-            have rr: forall j n m, (j \in task_arrivals_between arr_seq tsk n m) -> (j \in arrivals_between arr_seq n m).
-            { admit.}
-            apply rr in A_IN_TAB.
-            apply rr in B_IN_TAB.
+            have tab_implies_ab: forall j n m, (j \in task_arrivals_between arr_seq tsk n m) -> (j \in arrivals_between arr_seq n m).
+            {intros. rewrite mem_filter in H2. by move: H2 => /andP [/eqP].}
+            apply tab_implies_ab in A_IN_TAB as A_IN_AB.
+            apply tab_implies_ab in B_IN_TAB as B_IN_AB.
             
-            feed_n 6  RESPECTS_SPORADIC => //; try by auto.
-            - by apply in_arrivals_implies_arrived in A_IN_TAB.
-            - by apply in_arrivals_implies_arrived in B_IN_TAB.
-            - admit.
-            - admit.
+            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
+            - by apply in_arrivals_implies_arrived in A_IN_AB.
+            - by apply in_arrivals_implies_arrived in B_IN_AB.
+            - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
+            - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
             - admit.
               
-            apply in_arrivals_implies_arrived_between in A_IN_TAB; last by auto.
-            apply in_arrivals_implies_arrived_between in B_IN_TAB; last by auto.
-            unfold  arrived_between in A_IN_TAB.
-            unfold  arrived_between in B_IN_TAB.
+            apply in_arrivals_implies_arrived_between in A_IN_AB; last by auto.
+            apply in_arrivals_implies_arrived_between in B_IN_AB; last by auto.
+            unfold  arrived_between in A_IN_AB.
+            unfold  arrived_between in B_IN_AB.
             admit. (* c? *)
           }
           apply contra_not_leq in CONTR; by auto.
