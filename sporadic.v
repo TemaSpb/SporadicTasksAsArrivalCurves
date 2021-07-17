@@ -109,6 +109,15 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
   Definition specifc_task_and_has_prev (tsk: Task) (j: Job) :=
     (job_task j == tsk) && (job_has_prev j).
 
+  Lemma lemma2: forall n:nat, (n.+1 * 2) %/ 2 = n.+1.
+  Proof.
+    move => n.
+    rewrite -(muln_divA (n.+1)).
+    rewrite (divnn 2).
+    simpl.
+      by [rewrite muln1].
+      apply (dvdnn 2).
+  Qed. 
 
   Remark periodic_task_respects_sporadic_task_model:
     forall tsk, valid_task_min_inter_arrival_time tsk ->
@@ -117,10 +126,8 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
   Proof.
     intros tsk VALID_TIME RESPECTS_SPORADIC x y z.
     rewrite /max_arrivals /sporadic_as_arrival /max_arrivals_for_min_inter_arrival_time.
-    move: VALID_TIME.
-    unfold valid_task_min_inter_arrival_time.
-    move:  RESPECTS_SPORADIC.
-    unfold respects_sporadic_task_model.
+    move:  RESPECTS_SPORADIC VALID_TIME.
+    unfold valid_task_min_inter_arrival_time, respects_sporadic_task_model.
     move: (task_min_inter_arrival_time tsk) => c.
     intros  RESPECTS_SPORADIC VALID_TIME.
     move: (arrivals_between arr_seq x y) => A.
@@ -162,25 +169,38 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
             { apply filter_uniq.
               apply arrivals_uniq; by auto. }
             move: H2 => [a [b [ABNOQ [A_IN_TAB B_IN_TAB]]]].
-            specialize (RESPECTS_SPORADIC a b).
+           
             unfold task_arrivals_between in A_IN_TAB.
             have tab_implies_ab: forall j n m, (j \in task_arrivals_between arr_seq tsk n m) -> (j \in arrivals_between arr_seq n m).
             {intros. rewrite mem_filter in H2. by move: H2 => /andP [/eqP].}
             apply tab_implies_ab in A_IN_TAB as A_IN_AB.
             apply tab_implies_ab in B_IN_TAB as B_IN_AB.
-            
+
+            destruct (leqP (job_arrival a) (job_arrival b)).
+            { specialize (RESPECTS_SPORADIC a b).
+
             feed_n 6 RESPECTS_SPORADIC => //; try by auto.
             - by apply in_arrivals_implies_arrived in A_IN_AB.
             - by apply in_arrivals_implies_arrived in B_IN_AB.
             - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
             - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
-            - admit.
-              
-            apply in_arrivals_implies_arrived_between in A_IN_AB; last by auto.
-            apply in_arrivals_implies_arrived_between in B_IN_AB; last by auto.
-            unfold  arrived_between in A_IN_AB.
-            unfold  arrived_between in B_IN_AB.
-            admit. (* c? *)
+              apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
+              unfold  arrived_between in A_IN_AB, B_IN_AB.
+              admit.
+            }
+             {
+            specialize (RESPECTS_SPORADIC b a).
+
+            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
+            - by apply in_arrivals_implies_arrived in B_IN_AB.
+            - by apply in_arrivals_implies_arrived in A_IN_AB.
+            - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
+            - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
+
+              apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
+              unfold  arrived_between in A_IN_AB, B_IN_AB.
+              admit.
+             }
           }
           apply contra_not_leq in CONTR; by auto.
         }
@@ -195,33 +215,29 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
         have LE3: number_of_task_arrivals arr_seq tsk (x + (k - c)) (x + k) <= 1.
         { (* Hard, probably. *)
           (* At most one job can arrive in an interval of length [c]. *)
+         
           admit.
         }
 
         rewrite (leqRW LE3) addn1.
         unfold div_ceil.
-        destruct (c %| k - c) eqn:EQ.
-        { destruct (c %| k) eqn:EQ1.
-          { rewrite divnBr; last by auto. { 
-             rewrite ltn_psubCl. {
-              {
-                admit.
-                (**rewrite divnn.
-                move: (k %/ c) => L.
-                simpl. **)
-              }
-            
-             }
-             {rewrite divn_gt0; by auto.
-            }
-            admit.}}
-          auto.
+        have ttt:  (k - c) %/ c < k %/ c.
+          { rewrite divnBr; last by auto.
+            rewrite divnn VALID_TIME.
+            simpl.
+            rewrite ltn_psubCl; try by ssrlia; try by auto.
+            rewrite divn_gt0; by auto.
           }
-        (* Shouldn't be too hard. *)
-        admit.
-        
-        
-      }
+          destruct (c %| k) eqn:EQ1.
+          {
+            have qevv:  (c %| k) ->  (c %| (k - c)); first by auto.
+            apply qevv in EQ1 as EQ2.
+            rewrite EQ2.
+            apply ttt.
+          }
+          destruct (c %| k - c) eqn:EQ; first by destruct (c %| k) eqn:EQ3; by auto.
+          auto.
+        }
     } 
   Admitted.
 
