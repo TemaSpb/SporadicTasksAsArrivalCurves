@@ -68,7 +68,7 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
     apply div.div0n.
   Qed.
 
-   Lemma leq_div_ceil2r:
+  Lemma leq_div_ceil2r:
     forall (d : nat) (m n : nat),
       m <= n -> div_ceil m d <= div_ceil n d.
   Proof.
@@ -90,14 +90,11 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
     intros tsk VALID_TIME.
     split.
     { rewrite /max_arrivals /sporadic_as_arrival /max_arrivals_for_min_inter_arrival_time.
-      by rewrite div_ceil0.
-    }
-    {
-      unfold monotone.
+      by rewrite div_ceil0. }
+    { unfold monotone.
       rewrite /max_arrivals /sporadic_as_arrival /max_arrivals_for_min_inter_arrival_time.
       intros x y LEQ.
-      by rewrite leq_div_ceil2r.
-    }
+      by rewrite leq_div_ceil2r. }
   Qed.
 
   Definition time_before_job_and_prev (j: Job) :=
@@ -109,32 +106,69 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
   Definition specifc_task_and_has_prev (tsk: Task) (j: Job) :=
     (job_task j == tsk) && (job_has_prev j).
 
-  Lemma lemma2: forall n:nat, (n.+1 * 2) %/ 2 = n.+1.
+  Lemma max_one_job_can_arrive_in_one_sporadic_min_inter_arrival_time:
+    forall tsk x y k, k - y <= task_min_inter_arrival_time tsk ->
+                      respects_sporadic_task_model arr_seq tsk ->
+                      number_of_task_arrivals arr_seq tsk (x + y) (x + k) <= 1.
   Proof.
-    move => n.
-    rewrite -(muln_divA (n.+1)).
-    rewrite (divnn 2).
-    simpl.
-      by [rewrite muln1].
-      apply (dvdnn 2).
-  Qed. 
+    intros  tsk x y k l_yk RESPECTS_SPORADIC.
+    have CONTR:  number_of_task_arrivals arr_seq tsk (x + y) (x + k) > 1 -> false.
+    { unfold respects_sporadic_task_model in RESPECTS_SPORADIC.
+      intros.
+      apply exists_two in H2; first last.
+      { apply filter_uniq.
+        apply arrivals_uniq; by auto. }
+        move: H2 => [a [b [ABNOQ [A_IN_TAB B_IN_TAB]]]].   
+        unfold task_arrivals_between in A_IN_TAB.
+        have tab_implies_ab: forall j n m, (j \in task_arrivals_between arr_seq tsk n m) -> (j \in arrivals_between arr_seq n m).
+          { intros; rewrite mem_filter in H2; by move: H2 => /andP [/eqP]. }
 
+          apply tab_implies_ab in A_IN_TAB as A_IN_AB.
+          apply tab_implies_ab in B_IN_TAB as B_IN_AB.
+          
+          destruct (leqP (job_arrival a) (job_arrival b)).
+          { specialize (RESPECTS_SPORADIC a b).
+            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
+              - by apply in_arrivals_implies_arrived in A_IN_AB.
+              - by apply in_arrivals_implies_arrived in B_IN_AB.
+              - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
+              - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
+
+            apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
+            unfold  arrived_between in A_IN_AB, B_IN_AB.
+            have _ : job_arrival b < x + y; by ssrlia. }
+
+          { specialize (RESPECTS_SPORADIC b a).
+
+            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
+              - by apply in_arrivals_implies_arrived in B_IN_AB.
+              - by apply in_arrivals_implies_arrived in A_IN_AB.
+              - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
+              - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
+
+            apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
+            unfold  arrived_between in A_IN_AB, B_IN_AB; by ssrlia. }
+          }
+          apply contra_not_leq in CONTR; by auto.
+          Qed.
+  
   Remark periodic_task_respects_sporadic_task_model:
     forall tsk, valid_task_min_inter_arrival_time tsk ->
            respects_sporadic_task_model arr_seq tsk ->
            respects_max_arrivals arr_seq tsk (max_arrivals tsk).
   Proof.
-    intros tsk VALID_TIME RESPECTS_SPORADIC x y z.
+    intros tsk VALID_TIME RESPECTS_SPORADIC x y leq_xy.
     rewrite /max_arrivals /sporadic_as_arrival /max_arrivals_for_min_inter_arrival_time.
-    move:  RESPECTS_SPORADIC VALID_TIME.
-    unfold valid_task_min_inter_arrival_time, respects_sporadic_task_model.
+    move: VALID_TIME.
+    unfold valid_task_min_inter_arrival_time.
+    specialize (max_one_job_can_arrive_in_one_sporadic_min_inter_arrival_time tsk).
     move: (task_min_inter_arrival_time tsk) => c.
-    intros  RESPECTS_SPORADIC VALID_TIME.
+    intros MAX_ONE_JOB VALID_TIME.
     move: (arrivals_between arr_seq x y) => A.
 
     have EX: exists k, y = x + k.
     { exists (y - x). ssrlia. }
-    move: EX => [k EQ]; subst y; clear z.
+    move: EX => [k EQ]; subst y; clear leq_xy.
     replace (x + k - x) with k; last by ssrlia.
  
     have EX: exists l, k <= l.
@@ -152,94 +186,47 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
         { subst k.
           unfold number_of_task_arrivals, task_arrivals_between, arrivals_between.
           rewrite big_geq; by ssrlia. }
-        { (* Hard, probably. *)
-          (* At most one job can arrive in an interval of length [c]. *)
-          (* if [0 < k < c], then [div_ceil k c = 1] and 
-             [number_of_task_arrivals arr_seq tsk x (x + k) <= 1]. *)
-          unfold div_ceil.
+        { unfold div_ceil.
           have FALSE_dvdn: c %| k = false.
           { unfold dvdn. rewrite modn_small; last by exact.
             rewrite eqn0Ngt.
             apply negbF; by exact. }
           rewrite FALSE_dvdn divn_small; last by exact.
-          have CONTR: number_of_task_arrivals arr_seq tsk x (x + k) > 1 -> false.
-          { unfold respects_sporadic_task_model in RESPECTS_SPORADIC.
-            intros.
-            apply exists_two in H2; first last.
-            { apply filter_uniq.
-              apply arrivals_uniq; by auto. }
-            move: H2 => [a [b [ABNOQ [A_IN_TAB B_IN_TAB]]]].
-           
-            unfold task_arrivals_between in A_IN_TAB.
-            have tab_implies_ab: forall j n m, (j \in task_arrivals_between arr_seq tsk n m) -> (j \in arrivals_between arr_seq n m).
-            {intros. rewrite mem_filter in H2. by move: H2 => /andP [/eqP].}
-            apply tab_implies_ab in A_IN_TAB as A_IN_AB.
-            apply tab_implies_ab in B_IN_TAB as B_IN_AB.
+          specialize (MAX_ONE_JOB x 0 k); intros.
+          feed_n 2 MAX_ONE_JOB.
+            - by ssrlia.
+            - by exact.
 
-            destruct (leqP (job_arrival a) (job_arrival b)).
-            { specialize (RESPECTS_SPORADIC a b).
-
-            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
-            - by apply in_arrivals_implies_arrived in A_IN_AB.
-            - by apply in_arrivals_implies_arrived in B_IN_AB.
-            - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
-            - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
-              apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
-              unfold  arrived_between in A_IN_AB, B_IN_AB.
-              admit.
-            }
-             {
-            specialize (RESPECTS_SPORADIC b a).
-
-            feed_n 6 RESPECTS_SPORADIC => //; try by auto.
-            - by apply in_arrivals_implies_arrived in B_IN_AB.
-            - by apply in_arrivals_implies_arrived in A_IN_AB.
-            - rewrite mem_filter in B_IN_TAB. by move: B_IN_TAB => /andP [/eqP].
-            - rewrite mem_filter in A_IN_TAB. by move: A_IN_TAB => /andP [/eqP].
-
-              apply in_arrivals_implies_arrived_between in A_IN_AB, B_IN_AB; try by auto.
-              unfold  arrived_between in A_IN_AB, B_IN_AB.
-              admit.
-             }
-          }
-          apply contra_not_leq in CONTR; by auto.
-        }
+          replace (x + 0) with x in MAX_ONE_JOB; first by exact.
+          by ssrlia. }
       }
       { specialize (IHl (k - c)).
         feed IHl; first by ssrlia.
 
         rewrite (num_arrivals_of_task_cat _ _ (x + (k - c))); last by ssrlia.
-
         rewrite (leqRW IHl).
-
-        have LE3: number_of_task_arrivals arr_seq tsk (x + (k - c)) (x + k) <= 1.
-        { (* Hard, probably. *)
-          (* At most one job can arrive in an interval of length [c]. *)
-         
-          admit.
-        }
-
-        rewrite (leqRW LE3) addn1.
+        specialize (MAX_ONE_JOB x (k-c) k); intros.
+        feed_n 2 MAX_ONE_JOB.
+          - by ssrlia.
+          - by exact.
+        
+        rewrite (leqRW MAX_ONE_JOB) addn1. 
         unfold div_ceil.
-        have ttt:  (k - c) %/ c < k %/ c.
+        have lkc:  (k - c) %/ c < k %/ c.
           { rewrite divnBr; last by auto.
             rewrite divnn VALID_TIME.
             simpl.
             rewrite ltn_psubCl; try by ssrlia; try by auto.
-            rewrite divn_gt0; by auto.
-          }
+            rewrite divn_gt0; by auto. }
           destruct (c %| k) eqn:EQ1.
-          {
-            have qevv:  (c %| k) ->  (c %| (k - c)); first by auto.
-            apply qevv in EQ1 as EQ2.
+          { have divck:  (c %| k) ->  (c %| (k - c)); first by auto.
+            apply divck in EQ1 as EQ2.
             rewrite EQ2.
-            apply ttt.
-          }
+            apply lkc. }
           destruct (c %| k - c) eqn:EQ; first by destruct (c %| k) eqn:EQ3; by auto.
-          auto.
+          by auto.
         }
-    } 
-  Admitted.
+    }
 
 
 End SporadicTasksAsArrivalCurves.
