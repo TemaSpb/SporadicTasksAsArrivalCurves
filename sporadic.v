@@ -225,8 +225,8 @@ Global Instance sporadic_as_arrival : MaxArrivals Task :=
             apply lkc. }
           destruct (c %| k - c) eqn:EQ; first by destruct (c %| k) eqn:EQ3; by auto.
           by auto.
-        }
+      }
     }
-
+    Qed.
 
 End SporadicTasksAsArrivalCurves.
